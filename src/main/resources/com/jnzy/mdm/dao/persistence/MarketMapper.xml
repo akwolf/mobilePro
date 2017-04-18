@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC
+        "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jnzy.mdm.dao.persistence.MarketMapper">
+
+    <!--获取应用市场分类-->
+    <select id="selMarketClass" parameterType="java.lang.Integer" resultType="com.jnzy.mdm.bean.market.MarketAppCategoryVO">
+        select category_id as categoryId,category_name as categoryName,parent_id as parentId,category_img as categoryImg
+        from m_market_app_category
+        where 1=1
+        <if test="categoryId!=null">
+            and parent_id=#{categoryId}
+        </if>
+    </select>
+    <!--根据categoryId获取子分类名称-->
+    <select id="selMarketChild" parameterType="java.lang.Integer" resultType="java.lang.String">
+      SELECT category_name as categoryName
+      from m_market_app_category
+      WHERE parent_id=#{categoryId}
+    </select>
+    <!--根据软件分类名称查询id-->
+    <select id="selMarketIdByName" parameterType="java.lang.String" resultType="java.lang.Integer">
+        select category_id as categoryId
+        from m_market_app_category
+        WHERE category_name=#{type}
+        limit 1
+    </select>
+    <!--获取分类下的列表-->
+    <select id="selMarketApp" parameterType="java.util.HashMap" resultType="com.jnzy.mdm.bean.market.MarketAppVO">
+        select a.app_id as appId,
+        a.softname as softname,a.icon as icon,a.package as packageStr,
+        a.download_num as download_num,a.version as version,
+        a.sys_require as sysRequire,a.desc as description,a.down_url as downUrl,a.app_size as appSize,
+        a.download_num as downloadNum
+        from m_market_app a
+        LEFT JOIN m_market_app_category b
+        on a.category_id=b.category_id
+        WHERE a.status=1
+        <if test="categoryName!=null">
+            and b.category_id=#{categoryId}
+        </if>
+        <if test="categoryName==null">
+            and (b.category_id=#{categoryId} or b.parent_id=#{categoryId})
+        </if>
+        ORDER by a.is_top ASC,
+        a.download_num DESC,
+        a.add_time DESC
+        limit #{startIndex},#{pageSize}
+    </select>
+    <!--根据app名获取app信息-->
+    <select id="selMarketAppName" parameterType="java.util.HashMap" resultType="com.jnzy.mdm.bean.market.MarketAppVO">
+        select
+        a.app_id as appId,
+        a.softname as softname,a.icon as icon,
+        a.version as version,
+        a.desc as description,
+        a.down_url as downUrl,
+        a.package as packageStr,
+        a.app_size as appSize,
+        a.download_num as downloadNum,
+        b.category_id as categoryId,
+        b.category_name as categoryName
+        from m_market_app a
+        LEFT JOIN m_market_app_category b
+        on a.category_id=b.category_id
+        WHERE a.softname like CONCAT('%', '${softname}', '%')
+        and a.status=1
+        ORDER by a.is_top ASC,
+        a.download_num DESC,
+        a.add_time DESC
+    </select>
+    <!--根据appId获取app详情-->
+    <select id="selAppDetailById" parameterType="java.lang.Integer" resultType="com.jnzy.mdm.bean.market.MarketAppVO">
+        select
+            a.softname as softname,
+            a.icon as icon,
+            a.version as version,
+            a.desc as description,
+            a.down_url as downUrl,
+            a.app_size as appSize,
+            a.package as packageStr,
+            a.download_num as downloadNum
+        from m_market_app a
+        WHERE a.app_id=#{appId}
+        and a.status=1
+        ORDER by a.is_top ASC,
+        a.download_num DESC,
+        a.add_time DESC
+        limit 1
+    </select>
+    <!--根据appId获取app的原图-->
+    <select id="selMarketImgList" parameterType="java.lang.Integer" resultType="java.lang.String">
+        select original as original
+        from m_market_app_img
+        where app_id=#{appId}
+        ORDER by add_time DESC
+    </select>
+    <!--给该应用下载次数+1-->
+    <update id="updateAppDownNum" parameterType="java.util.HashMap">
+      update m_market_app
+      set download_num=download_num+1
+      where app_id=#{appId}
+    </update>
+    <!--根据包名获取app详情-->
+    <select id="selMarketAppInfoByName" parameterType="java.lang.String" resultType="com.jnzy.mdm.bean.market.MarketAppVO">
+      select
+        a.app_id as appId,
+        a.softname as softname,a.icon as icon,
+        a.version as version,
+        a.desc as description,
+        a.down_url as downUrl,
+        a.package as packageStr,
+        a.app_size as appSize,
+        a.download_num as downloadNum,
+        b.category_id as categoryId,
+        b.category_name as categoryName
+        from m_market_app a
+        LEFT JOIN m_market_app_category b
+        on a.category_id=b.category_id
+        WHERE a.package=#{packageName}
+        and a.status=1
+        limit 1
+    </select>
+
+    <!--获取所有应用市场的包名-->
+    <select id="selMarketPackage" resultType="java.lang.String">
+        select package as package
+        from m_market_app
+        where status=1
+    </select>
+
+    <!--获取所有应用市场的包名 分页-->
+    <select id="selMarketPackagePage" resultType="java.lang.String">
+        select package as package
+        from m_market_app
+        where status=1
+        limit #{startIndex},#{pageSize}
+    </select>
+
+    <!-- 应用市场意见反馈-->
+    <insert id="insertMarketFeedback" parameterType="java.util.HashMap">
+      insert into m_market_feedback
+      (
+        feedback_content,
+        feedback_contact,
+        user_id,
+        add_time
+      )
+      VALUES
+      (
+        #{feedbackContent},
+        #{feedbackContact},
+        #{userId},
+        NOW()
+      )
+    </insert>
+
+</mapper>

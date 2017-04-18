@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC
+        "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jnzy.mdm.dao.persistence.BrowserMapper">
+
+    <!--获取城市-->
+    <select id="selCityProvince" parameterType="java.util.HashMap" resultType="com.jnzy.mdm.bean.other.AppCityVO">
+        select name as name,adcode as adcode,citylevel as citylevel,tq_mark as tqMark
+        from m_app_city
+        where
+        citylevel=#{citylevel}
+        <if test="adcode!=null">
+            and left(adcode,2)=#{adcode}
+        </if>
+    </select>
+
+    <!--根据城市名查code码-->
+    <select id="selCityCode" parameterType="java.util.HashMap" resultType="java.lang.String">
+        SELECT tq_mark as tqMark
+        from m_app_city
+        where
+        name like CONCAT('%','${cityName}','%')
+    </select>
+
+    <!--网址导航数据-->
+    <select id="websiteNavigationHome" resultType="com.jnzy.mdm.bean.other.WebsiteNavigationVO">
+        SELECT website_name as websiteName,website_logo as websiteLogo,website_url as websiteUrl
+        FROM m_website_navigation
+        where is_del=0
+        ORDER by sort ASC
+        limit #{startIndex},#{pageSize}
+    </select>
+
+    <!--根据标识查询是否存在改数据-->
+    <select id="selBookmarkByIdent" parameterType="com.jnzy.mdm.bean.browser.BookMarkVO" resultType="java.lang.Integer">
+        select bookmark_ident
+        from m_browser_bookmark
+        where bookmark_ident=#{bookMarkVO.bookmarkIdent} and user_id=#{bookMarkVO.userId}
+    </select>
+
+    <!--更新数据-->
+    <update id="updateBookmark" parameterType="com.jnzy.mdm.bean.browser.BookMarkVO">
+        UPDATE m_browser_bookmark
+        set bookmark_name=#{bookMarkVO.bookmarkName},bookmark_url=#{bookMarkVO.bookmarkUrl},level=#{bookMarkVO.level}
+        where bookmark_ident=#{bookMarkVO.bookmarkIdent} and user_id=#{bookMarkVO.userId}
+    </update>
+
+    <!--插入书签数据-->
+    <insert id="insertBookmark" parameterType="java.util.List">
+      insert into m_browser_bookmark
+        (bookmark_name,bookmark_url,user_id,bookmark_ident,level)
+        values
+        <foreach collection="bookMarkVOList" item="item" index="index" separator="," >
+            (#{item.bookmarkName},#{item.bookmarkUrl},#{item.userId},#{item.bookmarkIdent},#{item.level})
+        </foreach>
+    </insert>
+
+    <!--删除书签数据-->
+    <delete id="delBookmark" parameterType="java.util.HashMap">
+      DELETE from m_browser_bookmark
+      where bookmark_ident=#{bookmarkIdent} and user_id=#{userId}
+    </delete>
+
+    <!--查询书签数据-->
+    <select id="selBookmarkByUserId" parameterType="java.util.HashMap" resultType="com.jnzy.mdm.bean.browser.BookMarkVO">
+      select bookmark_name as bookmarkName,bookmark_url as bookmarkUrl,bookmark_ident as bookmarkIdent,level as level
+      from m_browser_bookmark
+      where user_id=#{userId}
+      limit #{startIndex},#{pageSize}
+    </select>
+
+</mapper>

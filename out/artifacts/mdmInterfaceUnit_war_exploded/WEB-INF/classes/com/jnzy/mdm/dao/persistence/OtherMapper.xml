@@ -1,0 +1,423 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC
+        "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jnzy.mdm.dao.persistence.OtherMapper">
+    <!--查看数据库中是否有存在该用户最后一次登录时间-->
+    <select id="selUserLastTime" parameterType="java.util.HashMap" resultType="java.lang.String">
+        select create_time as createTime
+        from m_user_online_time
+        where user_id=#{userId}
+        limit 1
+    </select>
+    <!--插入用户的最后一次登陆时间-->
+    <insert id="insertUserLastTime" parameterType="java.util.HashMap">
+        INSERT into m_user_online_time
+        (user_id,create_time)
+        value(#{userId},NOW())
+    </insert>
+
+    <!--更新用户的最后一次登陆时间-->
+    <update id="updateUserLastTime" parameterType="java.util.HashMap">
+        UPDATE m_user_online_time
+        set create_time=NOW()
+        where user_id=#{userId}
+    </update>
+
+    <!--更新时间倒叙查询出该设备最新一条锁屏状态-->
+    <select id="selPushLogLockscreen" parameterType="java.util.HashMap" resultType="java.lang.Integer">
+        select is_use as isUse
+        from m_app_push_log
+        where device_id=#{deviceId} and push_model=#{pushModel}
+        ORDER BY update_time DESC
+        limit 1
+    </select>
+    <!--锁屏应用-->
+    <select id="selLockscreenApp" parameterType="java.util.HashMap" resultType="java.lang.String">
+        select
+        a.push_msg as pushMsg
+        from m_app_push_log a
+        WHERE a.push_model=6 and a.is_del=0 and a.is_use=0
+    </select>
+    <!--应用基础配置-->
+    <select id="selAppConfig" resultType="java.lang.Integer">
+      SELECT status as status
+      from m_app_config
+      limit 1
+    </select>
+    <!--根据appName获取包名-->
+    <select id="selPackageNameByAppname" parameterType="java.lang.String" resultType="java.lang.String">
+        select package
+        from m_market_app
+        where softname=#{appname}
+        limit 1
+    </select>
+    <!--应用黑白名单的包名-->
+    <select id="selappListBlackWhite" parameterType="java.util.HashMap" resultType="java.lang.String">
+        SELECT
+            a.push_msg as pushMsg
+        FROM
+           m_app_push_log a
+        where a.is_del=0 and a.push_model=#{type}
+    </select>
+    <!--网址基础设置-->
+    <select id="selUrlConfig" resultType="java.lang.Integer">
+      select status
+      from m_url_config
+      limit 1
+    </select>
+    <!--获取网址黑白名单地址-->
+    <select id="selUrlListBlackWhite" parameterType="java.util.HashMap" resultType="com.jnzy.mdm.bean.other.ListWebsiteVO">
+      select websiteUrl,type,addTime,isDel
+      from (
+        select url as websiteUrl,type as type,
+        date_format(
+        add_time,
+        '%Y-%m-%d %H:%i:%s'
+        ) as addTime,is_del as isDel
+        from m_list_website
+        where 1=1
+        <if test="addTime!=null">
+            and add_time>#{addTime}
+        </if>
+        <if test="addTime==null">
+            and is_del=0
+        </if>
+        ORDER by add_time DESC
+      ) a
+        GROUP BY websiteUrl
+        ORDER by addTime ASC
+        limit 50
+    </select>
+    <!--网址导航数据-->
+    <select id="selWebsiteNavigation" resultType="com.jnzy.mdm.bean.other.WebsiteNavigationVO">
+      SELECT website_name as websiteName,website_logo as websiteLogo,website_url as websiteUrl
+      FROM m_website_navigation
+      where is_del=0
+      ORDER by sort ASC
+    </select>
+    <!--插入到一键定位-->
+    <insert id="insertMobileGps" parameterType="java.util.HashMap">
+        INSERT INTO m_mobile_gps
+        (
+        lon,
+        lat,
+        user_id,
+        create_time
+        <if test="pushId!=null">
+        ,push_id
+        </if>
+        <if test="address!=null">
+          ,address
+        </if>
+        )
+        VALUES
+        (
+        #{lng},
+        #{lat},
+        #{userId},
+        NOW()
+        <if test="pushId!=null">
+            ,#{pushId}
+        </if>
+        <if test="address!=null">
+            ,#{address}
+        </if>
+        )
+
+    </insert>
+    <!--更新用户手机信息-->
+    <update id="updateUserMobileInfo" parameterType="java.util.HashMap">
+      UPDATE m_user
+      <set>
+          <if test="manufacturer!=null" >
+              manufacturer=#{manufacturer},
+          </if>
+          <if test="mobileos!=null">
+              mobileos=#{mobileos},
+          </if>
+          <if test="sdCapacity!=null ">
+              sd_capacity=#{sdCapacity},
+          </if>
+          <if test="outlaySdCapacity!=null ">
+              outlay_sd_capacity=#{outlaySdCapacity},
+          </if>
+          <if test="outlaySdCapacity==null ">
+              outlay_sd_capacity='0',
+          </if>
+          <if test="mac!=null ">
+              mac=#{mac},
+          </if>
+          <if test="serialNumber!=null ">
+              serial_number=#{serialNumber},
+          </if>
+          <if test="sysVersion!=null ">
+              sys_version=#{sysVersion},
+          </if>
+      </set>
+        where device_id=#{deviceId}
+    </update>
+    <!--插入到手机开机跟是否root表-->
+    <insert id="insertRootTimeLog" parameterType="java.util.HashMap">
+        INSERT INTO m_user_root_time_log
+        (
+          user_id
+          ,device_id
+          ,boot_time
+          ,is_root
+          ,add_time
+          <if test="rootTime!=null">
+              root_time
+          </if>
+        )
+        VALUES (
+        #{userId}
+        ,#{deviceId}
+        ,NOW()
+        ,#{isRoot}
+        ,NOW()
+        <if test="rootTime!=null">
+            #{rootTime}
+        </if>
+        )
+    </insert>
+
+    <!--更改用户的手机IMSI-->
+    <update id="updateUserImsi" parameterType="java.util.HashMap">
+      update m_user
+      set imsi=#{imsi}
+      where device_id=#{deviceId}
+    </update>
+
+    <!--如果imsi不为null，isOnline不为null-->
+    <update id="updateUserImsiOnline" parameterType="java.util.HashMap">
+        UPDATE m_user
+        <set>
+            <if test="imsi!=null">
+                imsi=#{imsi},
+            </if>
+            <if test="isOnline!=null">
+                is_online=#{isOnline} ,
+            </if>
+        </set>
+        where user_id=#{userId}
+    </update>
+
+    <!-- 判断数据库中是否有设备号跟imsi的违规记录 -->
+    <select id="selrecodrdIllegalInfo" parameterType="java.util.HashMap" resultType="java.lang.Integer">
+      select illegal_id as illegalId
+      from ${table}
+      where user_id=#{userId} and imsi=#{imsi} and type=6
+      limit 1
+    </select>
+
+    <!--获取网址黑白名单地址 分页-->
+    <select id="selUrlListBlackWhitePage" parameterType="java.util.HashMap" resultType="com.jnzy.mdm.bean.other.ListWebsiteVO">
+        select websiteUrl,type,addTime,isDel
+        from (
+
+            select url as websiteUrl,type as type,
+            date_format(
+            add_time,
+            '%Y-%m-%d %H:%i:%s'
+            ) as addTime,is_del as isDel
+            from m_list_website
+            where 1=1
+            <if test="addTime!=null">
+                and add_time>#{addTime}
+            </if>
+            <if test="addTime==null">
+                and is_del=0
+            </if>
+            ORDER BY add_time desc
+        )a
+        GROUP BY websiteUrl
+        ORDER by addTime ASC
+        limit #{startIndex},#{pageSize}
+    </select>
+
+    <!--查询本次需更新的网址黑白名单记录数-->
+    <select id="selWebSiteCount" parameterType="java.util.HashMap" resultType="java.util.Map">
+        select count(1) num from m_list_website where 1=1
+        <if test="addTime!=null">
+            and add_time>#{addTime}
+        </if>
+    </select>
+
+    <!--获取网址黑白名单地址 随机获取200-->
+    <select id="selUrlListBlackWhiteRdom" parameterType="java.util.HashMap" resultType="com.jnzy.mdm.bean.other.ListWebsiteVO">
+        SELECT url AS websiteUrl,TYPE AS TYPE,
+        DATE_FORMAT(
+        add_time,
+        '%Y-%m-%d %H:%i:%s'
+        ) AS ADDTIME,is_del AS isDel
+        FROM m_list_website AS w JOIN (SELECT ROUND(RAND() * (SELECT MAX(website_id) FROM m_list_website)) AS id ) AS w2
+        WHERE 1=1 AND
+        w.website_id>=w2.id
+        ORDER BY add_time ASC LIMIT 200
+    </select>
+
+    <!--查询应用黑白名单包名数量-->
+    <select id="selListBlackWhiteCount" parameterType="java.util.Map" resultType="java.lang.Integer">
+        SELECT count(1) FROM m_market_app m  JOIN m_list_app a ON m.softname=a.app_name
+        AND a.type=#{type}
+    </select>
+
+    <!--查询应用黑白名单所有包名-->
+    <select id="selListBlackWhite" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT package as  packageName FROM m_list_app m
+        where m.type=#{type}
+        GROUP BY m.app_name
+    </select>
+    <!--应用黑白名单 返回所有可以使用的应用-->
+    <!--<select id="selListBlackWhite" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT package as packageName FROM m_market_app m  JOIN m_list_app a ON m.softname=a.app_name
+        where a.type=#{type}
+        GROUP BY m.softname
+    </select>-->
+
+    <!--插入到用户动态ip日志-->
+    <insert id="insertUserIpLog" parameterType="java.util.Map">
+        insert into m_user_ip_log
+        (
+          user_id
+          ,app_local_ip
+          ,begin_time
+          ,create_time
+          )
+        VALUES
+        (
+          #{userId}
+          ,#{appLocalIp}
+          ,#{beginTime}
+          ,NOW()
+        )
+    </insert>
+
+    <!--查出最后一次用户ip-->
+    <select id="selUserLastIp" parameterType="java.util.HashMap" resultType="com.jnzy.mdm.bean.other.UserIpLogVO">
+        select id as id,app_local_ip as appLocalIp
+        from m_user_ip_log
+        WHERE user_id=#{userId}
+        ORDER by create_time DESC
+        limit 1
+    </select>
+
+    <!---更改该条记录时间-->
+    <update id="updateUserLastIp" parameterType="java.util.HashMap">
+      UPDATE m_user_ip_log
+      set end_time=#{beginTime}
+      where id=#{userIpLogId}
+    </update>
+
+    <!--从数据库表m_app_lockscreen中获取数据-->
+    <select id="selByLockscreenApp" resultType="java.lang.String">
+      SELECT package_name as packageName
+      from m_app_lockscreen
+      where status=1 and is_show=1
+    </select>
+
+    <!--将数据插入到手机目录文件表-->
+    <insert id="insertAppCatalog" parameterType="java.util.Map">
+      INSERT into ${table}
+      (
+        user_id
+        ,current_catalog_name
+        ,current_catalog_file
+        ,catalog_type
+        ,catalog_level
+        ,catalog_size
+        ,create_time
+      ) VALUES
+      <foreach collection="list" item="item" index="index" separator=",">
+        (
+          #{item.userId}
+          ,#{item.currentCatalogName}
+          ,#{item.currentCatalogFile}
+          ,#{item.catalogType}
+          ,#{item.catalogLevel}
+          ,#{item.catalogSize}
+          ,NOW()
+        )
+      </foreach>
+
+    </insert>
+
+    <!--将数据插入到手机sd卡记录-->
+    <insert id="insertSDcardLog" parameterType="java.util.HashMap">
+        insert INTO m_user_sdcard_log
+        (
+        user_id
+        ,is_sdcard
+        <if test="sdcardTime!=null">
+            ,sdcard_time
+        </if>
+        ,add_time
+        )
+        VALUES
+        (
+        #{userId}
+        ,#{isSdcard}
+        <if test="sdcardTime!=null">
+            ,#{sdcardTime}
+        </if>
+        ,NOW()
+        )
+    </insert>
+
+    <!--获取手机当前权限-->
+    <insert id="insertUserPermissions" parameterType="java.util.HashMap">
+        insert into m_user_permissions
+        (user_id,permissions,create_time)
+        VALUES
+        (#{userId},#{permissions},NOW())
+    </insert>
+
+    <!--获取笑话内容-->
+    <select id="selPhilContent" parameterType="java.lang.Integer" resultType="java.lang.String">
+        select phil_content
+        from m_app_philosophy
+        where phil_id=#{philId}
+    </select>
+
+    <!--获取技术客户邮箱-->
+    <select id="selEmail" resultType="java.lang.String">
+        select email
+        from m_market_email
+        ORDER BY add_time desc
+        limit 1
+    </select>
+
+    <!--根据registrationId跟deviceId查询是否存在该条记录-->
+    <select id="selPushRegistId" parameterType="java.util.HashMap" resultType="java.lang.Integer">
+      select reg_id as regId
+      from m_app_push_registration_id
+      where device_id=#{deviceId} and registration_id=#{registrationId}
+      limit 1
+    </select>
+
+    <!--插入到手机推送注册ID记录表-->
+    <insert id="insertPushRegistId" parameterType="java.util.HashMap">
+      insert into m_app_push_registration_id
+      (
+        device_id,
+        registration_id,
+        add_time
+      )
+      values
+      (
+        #{deviceId},
+        #{registrationId},
+        NOW()
+      )
+    </insert>
+
+    <!--更新手机推送注册ID记录表-->
+    <update id="updatePushRegistId" parameterType="java.util.HashMap">
+      UPDATE m_app_push_registration_id
+      set add_time=NOW()
+      where device_id=#{deviceId} and registration_id=#{registrationId}
+    </update>
+
+</mapper>

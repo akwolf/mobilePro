@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC
+        "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jnzy.mdm.dao.persistence.FileMapper">
+
+    <!--保存到定制机远程文件表中-->
+    <insert id="insertFileRemote" parameterType="java.util.HashMap">
+      INSERT INTO m_mobile_file_remote
+      (
+        server_path,
+        user_id,
+        push_id,
+        type,
+        create_time
+        <if test="fileType!=null">
+        ,file_type
+        </if>
+      <if test="fileAppPath!=null">
+        ,file_app_path
+      </if>
+      <if test="fileAppName!=null">
+      ,file_app_name
+      </if>
+      )
+      VALUES
+      (
+        #{serverPath}
+        ,#{userId}
+        ,#{pushId}
+        ,#{type}
+        ,NOW()
+        <if test="fileType!=null">
+        ,#{fileType}
+        </if>
+      <if test="fileAppPath!=null">
+      ,#{fileAppPath}
+      </if>
+      <if test="fileAppName!=null">
+      ,#{fileAppName}
+      </if>
+      )
+    </insert>
+
+</mapper>

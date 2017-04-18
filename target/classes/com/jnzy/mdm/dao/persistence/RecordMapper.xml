@@ -1,0 +1,581 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC
+        "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jnzy.mdm.dao.persistence.RecordMapper">
+    <!--根据设备号查询出该用户id  过滤器里-->
+    <select id="selUserIdByDeviceId" parameterType="java.util.HashMap" resultType="com.jnzy.mdm.bean.user.UserVO">
+       SELECT
+            a.user_id AS userId,
+            a.o_id AS organId,
+            a.imsi AS imsi,
+            a.is_online AS isOnline,
+            a.STATUS AS STATUS,
+            a.is_delete AS isDelete,
+            a.model_id AS modelId,
+            CONCAT(b.mobile_version,b.imei) as  modelTag
+        FROM
+            m_user a
+        LEFT JOIN m_mobile_model b
+        on a.model_id=b.id
+        where device_id=#{deviceId}  and customized=#{biaoshi}
+        limit 1
+    </select>
+
+    <!--根据callTime通话时间跟userId判断数据库中是否有重复-->
+    <select id="selRecordCallInfo" parameterType="java.util.HashMap" resultType="java.lang.Integer">
+        select call_id as callId
+        from ${table}
+        where call_time=#{callTime} and user_id=#{userId}
+        limit 1
+    </select>
+    
+    <!--插入到通话记录表-->
+    <insert id="insertRecordCall" parameterType="java.util.HashMap">
+      INSERT INTO ${table}
+      (
+        create_time
+        <if test="contact!=null">
+            ,contact
+        </if>
+            ,call_number
+            ,call_time
+            ,time_length
+            ,user_id
+          ,o_id
+          ,type
+      )
+      VALUES
+      (
+        NOW()
+        <if test="contact!=null">
+            ,#{contact}
+        </if>
+            ,#{callNumber}
+            ,#{callTime}
+            ,#{timeLength}
+        ,#{userId}
+        ,#{oId}
+        ,#{type}
+      )
+    </insert>
+
+    <!--插入到通话记录表-->
+    <insert id="insertRecordCallList" parameterType="java.util.HashMap">
+        INSERT INTO ${table}
+        (
+        create_time
+        ,contact
+        ,call_number
+        ,call_time
+        ,time_length
+        ,user_id
+        ,o_id
+        ,type
+        )
+        values
+        <foreach collection="callList" item="item" index="index" separator=",">
+            (
+            NOW()
+            ,#{item.contact}
+            ,#{item.callNumber}
+            ,#{item.callTime}
+            ,#{item.timeLength}
+            ,#{item.userId}
+            ,#{item.organId}
+            ,#{item.type}
+            )
+        </foreach>
+    </insert>
+
+    <!--通话拦截记录表-->
+    <insert id="insertRecordCallIntercept" parameterType="java.util.HashMap">
+        INSERT into ${table}
+        (
+        call_number
+        <if test="contact!=null">
+            ,contact
+        </if>
+        ,add_time
+        ,create_time
+        ,user_id
+        ,o_id
+        ,type
+        )
+        VALUES
+        (
+        #{callNumber}
+        <if test="contact!=null">
+          ,#{contact}
+        </if>
+        ,#{addTime}
+        ,NOW()
+        ,#{userId}
+        ,#{oId}
+        ,#{type}
+        )
+    </insert>
+    <!--判断电子围栏是否重复-->
+    <select id="selRecordIllegal" parameterType="java.util.HashMap" resultType="java.lang.Integer">
+        select illegal_id as illegalId
+        from ${table}
+        where  user_id=#{userId} and add_time=#{addTime}
+        limit 1
+    </select>
+
+    <!--插入到违规记录表-->
+    <insert id="insertRecordIllegal" parameterType="java.util.HashMap">
+      insert into ${table}
+      (
+      add_time
+      ,create_time
+      ,type
+      ,user_id
+      ,o_id
+      ,content
+        <if test="contact!=null">
+        ,contact
+        </if>
+        <if test="number!=null">
+        ,number
+        </if>
+        ,status
+        ,remarks
+        <if test="imsi!=null">
+          ,imsi
+        </if>
+      )
+      values
+      (
+      #{addTime}
+      ,NOW()
+      ,#{illegalType}
+      ,#{userId}
+      ,#{oId}
+      ,#{content}
+      <if test="contact!=null">
+      ,#{contact}
+      </if>
+        <if test="number!=null">
+        ,#{number}
+        </if>
+      ,#{status}
+        ,'接口'
+        <if test="imsi!=null">
+            ,#{imsi}
+        </if>
+      )
+    </insert>
+    <!--插入到违规记录电子围栏表-->
+    <insert id="insertRecordIllegalRail" parameterType="java.util.HashMap">
+        insert into ${table}
+        (
+        add_time
+        ,create_time
+        ,type
+        ,user_id
+        ,o_id
+        ,content
+        ,status
+        ,remarks
+        )
+        values
+        (
+        #{addTime}
+        ,NOW()
+        ,#{illegalType}
+        ,#{userId}
+        ,#{oId}
+        ,#{content}
+        ,#{status}
+        ,'接口'
+        )
+    </insert>
+    <!--插入到通讯录记录-->
+    <insert id="insertRecordIm" parameterType="java.util.HashMap">
+        INSERT INTO ${table}
+        (user_id,o_id,add_time,create_time
+        <if test="contact!=null">
+            ,contact
+        </if>
+        <if test="callNumber!=null">
+            ,call_number
+        </if>
+        )
+        VALUES
+        (#{userId},#{oId},#{addTime},NOW()
+        <if test="contact!=null">
+            ,#{contact}
+        </if>
+        <if test="callNumber!=null">
+            ,#{callNumber}
+        </if>
+        )
+
+    </insert>
+    <!--插入到通讯录记录-->
+    <insert id="insertRecordImList" parameterType="java.util.HashMap">
+        INSERT INTO ${table}
+        (user_id,o_id,add_time,create_time,contact,call_number
+        )
+        VALUES
+        <foreach collection="contacts" item="item" index="index" separator="," >
+            (#{item.userId},#{item.organId},#{item.addTime},NOW(),#{item.contact},#{item.callNumber})
+        </foreach>
+
+    </insert>
+    <!-- 判断短信是否重复-->
+    <select id="selRecordSms" parameterType="java.util.HashMap" resultType="java.lang.Integer">
+      SELECT sms_id as smsId
+      FROM ${table}
+      where user_id=#{userId} and send_time=#{addTime}
+      limit 1
+    </select>
+
+    <!--插入到短信记录-->
+    <insert id="insertRecordsms" parameterType="java.util.HashMap">
+      insert into ${table}
+      (
+        number,content,send_time,user_id,o_id,type,create_time
+        <if test="contact!=null">
+            ,contact
+        </if>
+      )
+      VALUES
+      (
+        #{number},#{content},#{addTime},#{userId},#{oId},#{type},NOW()
+        <if test="contact!=null">
+            ,#{contact}
+        </if>
+      )
+    </insert>
+    <!--插入到短信记录-->
+    <insert id="insertRecordsmsList" parameterType="java.util.HashMap">
+        insert into ${table}
+        ( number,content,send_time,user_id,o_id,type,create_time,contact )
+        VALUES
+        <foreach collection="smss" item="item" index="index" separator=",">
+          (#{item.receiveNumber},#{item.content},#{item.addTime},#{item.userId},#{item.organId},#{item.type},NOW(),#{item.contact})
+        </foreach>
+    </insert>
+    <!--判断短信敏感词拦截记录是否重复-->
+    <select id="selSmsSensitive" parameterType="java.util.HashMap" resultType="java.lang.Integer">
+        select sens_id as sensId
+        from ${table}
+        where user_id=#{userId} and send_time=#{addTime}
+        limit 1
+    </select>
+    <!--插入到短信敏感词拦截记录-->
+    <insert id="insertRecordsmsSensitive" parameterType="java.util.HashMap">
+      INSERT INTO ${table}
+      (
+        source
+        ,content
+        ,sens_keywords
+        <if test="contact!=null">
+        ,contact
+        </if>
+        ,number
+        ,user_id
+        ,o_id
+        ,send_time
+        ,type
+        ,create_time
+      )
+      VALUES
+      (
+        #{source}
+        ,#{content}
+        ,#{sensKeywords}
+        <if test="contact!=null">
+            ,#{contact}
+        </if>
+        ,#{number}
+        ,#{userId}
+        ,#{oId}
+        ,#{addTime}
+        ,#{type}
+        ,NOW()
+      )
+    </insert>
+    <!--判断是否在应用列表中存在-->
+    <select id="selRecordAppList" parameterType="java.util.HashMap" resultType="com.jnzy.mdm.bean.record.UserApplistVO">
+        select app_id as appId,version_code as versionCode
+        from m_user_applist
+        WHERE user_id=#{userId} and package_name=#{packageName}
+        ORDER BY add_time DESC
+        limit 1
+    </select>
+    <!--用户在应用记录的应用名称-->
+    <select id="selAppSoftName" parameterType="java.util.HashMap" resultType="java.lang.String">
+      select soft_name as softName
+      from m_user_applist
+      where user_id=#{userId} and o_id=#{oId} and package_name=#{packageName}
+      limit 1
+    </select>
+    <!-- 应用列表记录-->
+    <insert id="insertRecordAppList" parameterType="java.util.HashMap">
+      INSERT INTO m_user_applist
+      (
+        soft_name
+        ,version
+        ,add_time
+        ,user_id
+        ,o_id
+        ,package_name
+        ,version_code
+        <if test="appMd5Sign!=null">
+          ,app_md5_sign
+        </if>
+      )
+      VALUES (
+        #{softName}
+        ,#{version}
+        ,NOW()
+        ,#{userId}
+        ,#{oId}
+        ,#{packageName}
+        ,#{versionCode}
+        <if test="appMd5Sign!=null">
+            ,#{appMd5Sign}
+        </if>
+      )
+    </insert>
+    <!-- 应用列表记录-->
+    <insert id="insertRecordCallListByMap" parameterType="java.util.HashMap">
+        INSERT INTO m_user_applist
+        (
+        soft_name
+        ,version
+        ,add_time
+        ,user_id
+        ,o_id
+        ,package_name
+        ,version_code
+        ,app_md5_sign
+        )
+        VALUES 
+        <foreach collection="appListRecords" item="item" separator="," index="index">
+            (
+            #{item.softName}
+            ,#{item.version}
+            ,NOW()
+            ,#{item.userId}
+            ,#{item.organId}
+            ,#{item.packageName}
+            ,#{item.versionCode}
+            ,#{item.appMd5Sign}
+            )
+        </foreach>
+    </insert>
+    <!--更新应用列表记录-->
+    <update id="updateRecordAppList" parameterType="java.util.HashMap">
+      update m_user_applist
+      set version=#{version},add_time=NOW(),version_code=#{versionCode}
+      <if test="appMd5Sign!=null">
+          ,app_md5_sign=#{appMd5Sign}
+      </if>
+      where user_id=#{userId} and package_name=#{packageName}
+    </update>
+
+    <!-- 应用使用记录表-->
+    <insert id="insertRecordAppUse" parameterType="java.util.HashMap">
+        INSERT INTO ${table}
+        (
+        package_name
+        ,time_length
+        <if test="visitedTime!=null">
+        ,visited_time
+        </if>
+        ,user_id
+        ,o_id
+        ,use_num
+        ,create_time
+        <if test="appName!=null">
+            ,app_name
+        </if>
+        )
+        VALUES (
+        #{packageName}
+        ,#{timeLength}
+        <if test="visitedTime!=null">
+        ,#{visitedTime}
+        </if>
+        ,#{userId}
+        ,#{oId}
+        ,#{useNum}
+        ,NOW()
+        <if test="appName!=null">
+            ,#{appName}
+        </if>
+        )
+    </insert>
+    <!--插入到上网记录表中-->
+    <insert id="insertRecordWebsite" parameterType="java.util.HashMap">
+    INSERT into ${table}
+        (
+        last_time
+        <if test="websiteName!=null">
+            ,name
+        </if>
+        ,user_id
+        ,o_id
+        ,type
+        ,url
+        )
+        VALUES (
+        NOW()
+        <if test="websiteName!=null">
+            ,#{websiteName}
+        </if>
+        ,#{userId}
+        ,#{oId}
+        ,#{websiteType}
+        ,#{websiteUrl}
+        )
+    </insert>
+    <!--插入到上网记录表中-->
+    <insert id="insertRecordWebsiteList" parameterType="java.util.HashMap">
+        INSERT into ${table}
+        (
+        last_time
+        <if test="websiteName!=null">
+            ,name
+        </if>
+        ,user_id
+        ,o_id
+        ,type
+        ,url
+        ,create_time
+        <if test="appLocalIp!=null">
+            ,app_local_ip
+        </if>
+        )
+        VALUES (
+        #{addTime}
+        <if test="websiteName!=null">
+            ,#{websiteName}
+        </if>
+        ,#{userId}
+        ,#{oId}
+        ,#{websiteType}
+        ,#{websiteUrl}
+        ,NOW()
+        <if test="appLocalIp!=null">
+            ,#{appLocalIp}
+        </if>
+        )
+    </insert>
+    <!-- 插入到上网敏感词记录表中-->
+    <insert id="insertRecordWebsiteSensitive" parameterType="java.util.HashMap">
+      INSERT into
+      ${table}
+      (
+        keywords
+      ,visited_time
+      <if test="websiteUrl!=null">
+      ,url
+      </if>
+      ,user_id
+      ,o_id
+        ,create_time
+      )
+      VALUES
+      (
+      #{keywords}
+      ,NOW()
+        <if test="websiteUrl!=null">
+      ,#{websiteUrl}
+        </if>
+      ,#{userId}
+      ,#{oId}
+        ,NOW()
+      )
+    </insert>
+    <!--list 插入到上网敏感词记录表中-->
+    <insert id="insertRecordWebsiteSensitiveList" parameterType="java.util.HashMap">
+        INSERT into
+        ${table}
+        (
+        keywords
+        ,visited_time
+        <if test="websiteUrl!=null">
+            ,url
+        </if>
+        ,user_id
+        ,o_id
+        ,create_time
+        <if test="appLocalIp!=null">
+            ,app_local_ip
+        </if>
+        )
+        VALUES
+        (
+        #{keywords}
+        ,#{addTime}
+        <if test="websiteUrl!=null">
+            ,#{websiteUrl}
+        </if>
+        ,#{userId}
+        ,#{oId}
+        ,NOW()
+        <if test="appLocalIp!=null">
+            ,#{appLocalIp}
+        </if>
+        )
+    </insert>
+    <!--更改用户的手机IMSI-->
+    <update id="updateUserImsi" parameterType="java.util.HashMap">
+      UPDATE m_user
+      set imsi=#{imsi}
+      where device_id=#{deviceId}
+    </update>
+
+    <!--获取到40s差的用户状态-->
+    <select id="selUserOnline" resultType="com.jnzy.mdm.bean.user.UserVO">
+        <![CDATA[
+        SELECT
+        CASE when b.create_time is null or b.create_time=''
+        then 1
+        else
+        case when
+        TIMESTAMPDIFF(SECOND,b.create_time,NOW())<=35
+        then 2
+        else 1
+        END
+        end
+        as isOnlineNow
+        ,a.is_online as isOnline
+        ,a.user_id as userId
+        ,a.o_id as organId
+        ]]>
+        from m_user a
+        left JOIN m_user_online_time b
+        on a.user_id=b.user_id
+        ORDER BY a.user_id ASC
+    </select>
+
+    <!--更改用户状态-->
+    <update id="updateUserOnline" parameterType="java.util.HashMap">
+        update m_user
+        set is_online=#{isOnline}
+        where user_id=#{userId}
+    </update>
+
+
+    <!--查询出3天内(259200)离线的用户  改为从数据库中查询间隔数-->
+    <select id="selUserOffline" resultType="com.jnzy.mdm.bean.user.UserVO">
+        SELECT
+            a.user_id AS userId,
+            b.o_id AS organId,
+            a.create_time AS createTime
+        FROM
+            m_user b
+        LEFT JOIN m_user_online_time a ON a.user_id = b.user_id
+        WHERE
+            TIMESTAMPDIFF(SECOND, a.create_time, NOW()) > (SELECT times from m_user_offline_time)
+            and b.status=1
+    </select>
+
+</mapper>

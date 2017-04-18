@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC
+        "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jnzy.mdm.syslog.dao.log.SysLogMapper">
+    <select id="selLogsTest" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT container_path,DATE_FORMAT(MAX(log_time),'%Y-%m-%d') log_time FROM sys_log where container_path=#{containerPath}
+    </select>
+
+    <insert id="saveLogTest" parameterType="java.util.List">
+        insert into sys_log(
+        log_id, log_level, server_ip, group_id, device_id, type, infos, log_time, container_path, create_time
+        ) values
+        <foreach collection="list" item="item" index="index" separator=",">
+            (#{item.logId},#{item.logLevel},#{item.serverIp},#{item.groupId},#{item.deviceId},#{item.type},
+            #{item.infos},#{item.logTime},#{item.containerPath},now())
+        </foreach>
+    </insert>
+
+    <insert id="logInfoChanges" parameterType="java.util.Map">
+      INSERT INTO ${tablename}(
+                  group_id,
+                  server_ip,
+                  device_id,
+                  container_path,
+                  uri,
+                  head,
+                  params,
+                  return_time,
+                  log_exception,
+                  log_time,
+                  create_time
+                )
+                SELECT
+                  GROUP_ID,
+                  server_ip,
+                  device_id,
+                  container_path,
+                  MAX(uri) uri,
+                  MAX(headparams) head,
+                  MAX(params) params,
+                  MAX(returntime) returntime,
+                  MAX(exception) exception,
+                  MIN(log_time) log_time,
+                  NOW()
+                FROM
+                      (SELECT
+                        GROUP_ID,
+                        server_ip,
+                        device_id,
+                        container_path,
+                        log_time,
+                        CASE
+                          WHEN TYPE = 1
+                          THEN infos
+                        END AS 'uri',
+                        CASE
+                          WHEN TYPE = 2
+                          THEN infos
+                        END AS 'headparams',
+                        CASE
+                          WHEN TYPE = 3
+                          THEN infos
+                        END AS 'params',
+                        CASE
+                          WHEN TYPE = 4
+                          THEN log_time
+                        END AS 'returntime',
+                        CASE
+                          WHEN TYPE = 5
+                          THEN infos
+                        END AS 'exception'
+                      FROM
+                        sys_log) a
+                GROUP BY GROUP_ID,
+                  server_ip,
+                  device_id,
+                  container_path
+                ORDER BY NULL
+    </insert>
+
+    <update id="updateLogError" parameterType="java.util.Map">
+        UPDATE ${tablename} SET log_level='ERROR' WHERE  log_exception IS NOT  NULL
+    </update>
+
+    <update id="updateLogInfo" parameterType="java.util.Map">
+        UPDATE ${tablename} SET log_level='INFO' WHERE  log_exception IS   NULL
+    </update>
+
+    <select id="selApplicationPaths" parameterType="java.util.Map" resultType="java.util.Map">
+        SELECT
+        d.application_id,
+        d.application_path,
+        l.status
+        FROM
+        sys_application_distribution d
+        LEFT JOIN
+        (SELECT * FROM sys_application_loginfo where 1=1
+        <if test="logTime!=null and logTime!=''">
+            and log_time=#{logTime}
+        </if>) l
+        ON d.application_id = l.application_id
+        WHERE d.is_deleted = 0
+    </select>
+
+    <insert id="saveResult" parameterType="java.util.Map">
+        insert into sys_application_loginfo(
+            application_id,
+            status,
+            create_time,
+            update_time,
+            log_time
+        )values(
+            #{application_id},
+            1,
+            now(),
+            now(),
+            DATE_SUB(CURDATE(),INTERVAL 1 DAY)
+        )
+    </insert>
+
+    <insert id="saveErrorLog" parameterType="java.util.Map">
+        insert into sys_interface_error_log(
+          log_level,server_ip,group_id,device_id,uri,head,params,
+          log_exception,log_time,return_time,create_time,container_path
+        )
+        select log_level,server_ip,group_id,device_id,uri
+         ,head,params,log_exception,log_time,return_time,create_time,container_path
+         from ${tablename} where log_level='ERROR'
+    </insert>
+
+    <delete id="delSyslog" parameterType="java.util.Map">
+          TRUNCATE sys_log
+    </delete>
+</mapper>

@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:tx="http://www.springframework.org/schema/tx"
+       xmlns:aop="http://www.springframework.org/schema/aop"
+       xmlns:p="http://www.springframework.org/schema/p" xmlns:redis="http://www.springframework.org/schema/redis"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.2.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.2.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-3.2.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-3.2.xsd http://www.springframework.org/schema/redis http://www.springframework.org/schema/redis/spring-redis.xsd"
+       default-lazy-init="false">
+
+    <!-- 使用annotation 自动注册bean, 并保证@Required、@Autowired的属性被注入 -->
+    <context:component-scan base-package="com.jnzy.mdm">
+        <!-- 不扫描controller -->
+        <context:exclude-filter type="annotation"
+                                expression="org.springframework.stereotype.Controller"/>
+
+    </context:component-scan>
+
+    <context:annotation-config/>
+
+    <aop:aspectj-autoproxy proxy-target-class="true"/>
+
+    <!-- 使用注解annotation定义事务 -->
+    <!-- <tx:annotation-driven transaction-manager="transactionManager" proxy-target-class="true"
+        /> -->
+    <bean id="propertyConfigurer"
+          class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+        <property name="locations">
+            <list>
+                <value>classpath*:/application.properties</value>
+                <value>classpath*:/redis.properties</value>
+            </list>
+        </property>
+    </bean>
+    <!--################数据源1开始#########################-->
+    <bean id="dataSource" class="com.jnzy.mdm.dao.cipher.CipherDataSource"
+          destroy-method="close" init-method="init">
+        <property name="driverClassName" value="${jdbc.driver}"/>
+        <property name="url" value="${jdbc.url}"/>
+        <property name="username" value="${jdbc.username}"/>
+        <property name="password" value="${jdbc.password}"/>
+        <!-- 初始化连接大小 -->
+        <property name="initialSize" value="${dbcp.initialSize}"/>
+        <!-- 连接池最大使用连接数量 -->
+        <property name="maxActive" value="${dbcp.maxActive}"/>
+        <!-- 获取连接最大等待时间 -->
+        <property name="maxWait" value="${dbcp.maxWait}"/>
+        <!-- 连接池最大空闲 -->
+        <property name="maxIdle" value="${dbcp.maxIdle}"/>
+        <!-- 连接池最小空闲 -->
+        <property name="minIdle" value="${dbcp.minIdle}"/>
+
+        <!-- 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位是毫秒 -->
+        <property name="timeBetweenEvictionRunsMillis" value="${timeBetweenEvictionRunsMillis}"/>
+        <!-- 配置一个连接在池中最小生存的时间，单位是毫秒 -->
+        <property name="minEvictableIdleTimeMillis" value="${minEvictableIdleTimeMillis}"/>
+
+        <property name="validationQuery" value="${validationQuery}"/>
+        <property name="testWhileIdle" value="${testWhileIdle}"/>
+        <property name="testOnBorrow" value="${testOnBorrow}"/>
+        <property name="testOnReturn" value="${testOnReturn}"/>
+        <property name="maxOpenPreparedStatements"
+                  value="${maxOpenPreparedStatements}"/>
+        <!-- 监控数据库 -->
+        <!-- <property name="filters" value="stat" /> -->
+        <property name="filters" value="mergeStat"/>
+    </bean>
+
+
+    <!-- transaction manager, use JtaTransactionManager for global tx -->
+    <bean id="transactionManager"
+          class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+        <property name="dataSource" ref="dataSource"/>
+    </bean>
+
+    <!-- MyBatis配置 -->
+    <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean"
+          lazy-init="false">
+        <property name="dataSource" ref="dataSource"/>
+        <property name="configLocation" value="classpath:mybatis/mybatis-config.xml"/>
+        <property name="mapperLocations">
+            <list>
+                <value>classpath:com/jnzy/mdm/dao/persistence/*.xml</value>
+                <value>classpath:com/jnzy/mdm/**/dao/persistence/*.xml</value>
+            </list>
+        </property>
+    </bean>
+
+    <!-- 通过扫描的模式，扫描目录在...目录下，所有的mapper都集成SqlMapper接口的接口，这样一个bean就可以啦 -->
+    <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+        <property name="basePackage" value="com.jnzy.mdm.dao"/>
+        <property name="markerInterface" value="com.jnzy.mdm.dao.SqlMapper"/>
+        <property name="sqlSessionFactoryBeanName" value="sqlSessionFactory"/>
+    </bean>
+
+
+    <!-- 使用通知管理事务-->
+    <aop:config>
+        <aop:pointcut id="pc"
+                      expression="execution(public * com.jnzy.mdm.service..*.*(..))"/>
+        <aop:advisor advice-ref="txAdvice" pointcut-ref="pc" order="1"/>
+    </aop:config>
+
+    <tx:advice id="txAdvice" transaction-manager="transactionManager">
+        <tx:attributes>
+            <tx:method name="update*" rollback-for="Exception"/>
+            <tx:method name="del*" rollback-for="Exception"/>
+            <tx:method name="insert*" rollback-for="Exception"/>
+            <tx:method name="pushMsgPhp" rollback-for="Exception"/>
+            <tx:method name="pushMsgPhpSpare" rollback-for="Exception"/>
+            <tx:method name="pushSuccFailNum" rollback-for="Exception"/>
+            <tx:method name="*" read-only="true"/>
+        </tx:attributes>
+    </tx:advice>
+    <!--################数据源1结束#########################-->
+    <!-- 统一的异常处理 -->
+    <bean id="exceptionResolver" class="com.jnzy.mdm.handler.ExceptionHandler"/>
+
+    <!--加载netty-->
+  <!--  <bean id="FileTransferServer" class="com.jnzy.mdm.netty.FileTransferServer" lazy-init="false"/>-->
+    <!--redis-->
+    <!--<bean class="org.springframework.session.data.redis.config.annotation.web.http.RedisHttpSessionConfiguration"/>
+    <bean id="poolConfig" class="redis.clients.jedis.JedisPoolConfig">-->
+        <!--获得一个jedis实例的时候是否检查连接可用性（ping()）-->
+        <!--<property name="testOnBorrow" value="true"/>
+
+    </bean>-->
+    <!-- 设置redis连接信息以及poolConfig -->
+    <!--<bean id="connectionFactory" class="org.springframework.data.redis.connection.jedis.JedisConnectionFactory"
+          p:hostName="${redis.host}" p:port="${redis.port}" p:password="${redis.pass}" p:poolConfig-ref="poolConfig"
+    />-->
+
+    <!-- session失效时间为3天 -->
+    <!--<bean class="org.springframework.session.data.redis.config.annotation.web.http.RedisHttpSessionConfiguration">
+    -->    <!--<property name="maxInactiveIntervalInSeconds" value="108000"/>-->
+        <!--设置为永不过期-->
+        <!--<property name="maxInactiveIntervalInSeconds" value="259200"/>
+    </bean>-->
+
+    <!--注入jdbcTemplate
+    <bean id="jdbcTemplate" class="org.springframework.jdbc.core.JdbcTemplate">
+        <property name="dataSource">
+            <ref bean="dataSource"/>
+        </property>
+    </bean> -->
+
+    <!--################数据源2开始#########################-->
+
+    <!-- 使用注解annotation定义事务
+    <tx:annotation-driven transaction-manager="transactionManager2" order="0" proxy-target-class="true"/>
+    -->
+
+    <bean id="dataSource2" class="com.jnzy.mdm.dao.cipher.CipherDataSource"
+          destroy-method="close" init-method="init">
+        <property name="driverClassName" value="${jdbc.log.driver}"/>
+        <property name="url" value="${jdbc.log.url}"/>
+        <property name="username" value="${jdbc.log.username}"/>
+        <property name="password" value="${jdbc.log.password}"/>
+        <!-- 初始化连接大小 -->
+        <property name="initialSize" value="${dbcp.initialSize}"/>
+        <!-- 连接池最大使用连接数量 -->
+        <property name="maxActive" value="${dbcp.maxActive}"/>
+        <!-- 获取连接最大等待时间 -->
+        <property name="maxWait" value="${dbcp.maxWait}"/>
+        <!-- 连接池最大空闲 -->
+        <property name="maxIdle" value="${dbcp.maxIdle}"/>
+        <!-- 连接池最小空闲 -->
+        <property name="minIdle" value="${dbcp.minIdle}"/>
+
+        <!-- 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位是毫秒 -->
+        <property name="timeBetweenEvictionRunsMillis" value="${timeBetweenEvictionRunsMillis}"/>
+        <!-- 配置一个连接在池中最小生存的时间，单位是毫秒 -->
+        <property name="minEvictableIdleTimeMillis" value="${minEvictableIdleTimeMillis}"/>
+
+        <property name="validationQuery" value="${validationQuery}"/>
+        <property name="testWhileIdle" value="${testWhileIdle}"/>
+        <property name="testOnBorrow" value="${testOnBorrow}"/>
+        <property name="testOnReturn" value="${testOnReturn}"/>
+        <property name="maxOpenPreparedStatements"
+                  value="${maxOpenPreparedStatements}"/>
+        <!-- 监控数据库 -->
+        <!-- <property name="filters" value="stat" /> -->
+        <property name="filters" value="mergeStat"/>
+    </bean>
+
+
+    <!-- transaction manager, use JtaTransactionManager for global tx-->
+    <bean id="transactionManager2"
+          class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+        <property name="dataSource" ref="dataSource2"/>
+    </bean>
+
+    <!-- MyBatis配置 -->
+    <bean id="sqlSessionFactoryLog" class="org.mybatis.spring.SqlSessionFactoryBean"
+          lazy-init="false">
+        <property name="dataSource" ref="dataSource2"/>
+        <property name="configLocation" value="classpath:mybatis/mybatis-config2.xml"/>
+        <property name="mapperLocations">
+            <list>
+                <value>classpath:com/jnzy/mdm/log/dao/*.xml</value>
+            </list>
+        </property>
+    </bean>
+
+    <!-- 通过扫描的模式，扫描目录在...目录下，所有的mapper都集成LogSqlMapper接口的接口，这样一个bean就可以啦 -->
+    <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+        <property name="basePackage" value="com.jnzy.mdm.syslog.dao.log"/>
+        <property name="markerInterface" value="com.jnzy.mdm.syslog.dao.LogSqlMapper"/>
+        <property name="sqlSessionFactoryBeanName" value="sqlSessionFactoryLog"/>
+    </bean>
+
+
+    <!-- 使用通知管理事务-->
+    <aop:config>
+        <aop:pointcut id="pc2"
+                      expression="execution(public * com.jnzy.mdm.syslog.service..*.*(..))"/>
+        <aop:advisor advice-ref="txAdvice2" pointcut-ref="pc2"/>
+    </aop:config>
+
+    <tx:advice id="txAdvice2" transaction-manager="transactionManager2">
+        <tx:attributes>
+            <tx:method name="readResource" rollback-for="Exception"/>
+            <tx:method name="insert*" rollback-for="Exception"/>
+            <tx:method name="save*" rollback-for="Exception"/>
+        </tx:attributes>
+    </tx:advice>
+
+    <!--################数据源2结束#########################-->
+
+
+    <!--redis start-->
+    <bean id="jedisPoolConfig" class="redis.clients.jedis.JedisPoolConfig">
+        <property name="maxIdle" value="${redis.maxIdle}" />
+        <property name="minIdle" value="${redis.minIdle}" />
+        <property name="maxTotal" value="${redis.maxTotal}" />
+        <property name="maxWaitMillis" value="${redis.maxWaitMillis}" />
+        <property name="testOnBorrow" value="${redis.testOnBorrow}" />
+    </bean>
+
+    <bean id="redisConnectionFactory"
+          class="org.springframework.data.redis.connection.jedis.JedisConnectionFactory">
+        <property name="hostName" value="${redis.host}" />
+        <property name="port" value="${redis.port}" />
+        <property name="password" value="${redis.password}" />
+        <property name="database" value="${redis.default.db}"/>
+        <constructor-arg index="0" ref="jedisPoolConfig" />
+    </bean>
+
+    <bean id="redisTemplate" class="org.springframework.data.redis.core.StringRedisTemplate">
+        <property name="connectionFactory"   ref="redisConnectionFactory" />
+    </bean>
+    <!--redis end-->
+
+</beans>

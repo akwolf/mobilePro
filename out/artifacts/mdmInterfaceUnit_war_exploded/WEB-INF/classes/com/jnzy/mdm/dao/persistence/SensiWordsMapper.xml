@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC
+        "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jnzy.mdm.dao.persistence.SensiWordsMapper">
+
+    <!--根据设备号查询出该组织id-->
+    <select id="selOrganIdByDeviceId" parameterType="java.lang.String" resultType="java.lang.Integer">
+        SELECT
+            o_id AS oId
+        FROM
+            m_user
+        WHERE
+            device_id =#{deviceId} and customized=#{biaoshi}
+        LIMIT 1
+    </select>
+
+   <!--根据组织id查询出该组织所有敏感词-->
+    <select id="selSensitiveSmsInfo" parameterType="java.util.HashMap" resultType="com.jnzy.mdm.bean.push.PushAppVO">
+        SELECT
+        a.push_msg AS pushMsg,
+        date_format(
+        a.update_time,
+        '%Y-%m-%d %H:%i:%s'
+        ) AS addTime,
+        a.is_del as isDel,
+        a.is_use as isUse
+        FROM
+         m_app_push_log a
+        WHERE
+            a.push_model=2
+            AND find_in_set(#{organId},tag_name)
+            <if test="addTime!=null">
+              and  a.update_time>#{addTime}
+            </if>
+        ORDER BY
+            a.update_time ASC
+    </select>
+    <!--根据组织id查询出该组织所有上网敏感词-->
+    <select id="selSensitiveWebInfo" parameterType="java.util.HashMap" resultType="com.jnzy.mdm.bean.sensiWords.SensitiveWebVO">
+      SELECT
+        a.keywords AS keywords,
+        date_format(
+        a.add_time,
+        '%Y-%m-%d %H:%i:%s'
+        ) AS addTime,
+        a.is_del as isDel
+        FROM
+            m_sensitive_web a
+        LEFT JOIN m_sensitive_web_organ b
+        on a.sensitive_id=b.w_id
+        where b.o_id=#{organId}
+        <if test="addTime!=null">
+            and  a.add_time>#{addTime}
+        </if>
+    </select>
+    <!--文件敏感词的获取-->
+    <select id="selSensitiveFileInfo" parameterType="java.util.HashMap" resultType="com.jnzy.mdm.bean.push.PushAppVO">
+        SELECT
+        a.push_msg AS pushMsg,
+        date_format(
+        a.update_time,
+        '%Y-%m-%d %H:%i:%s'
+        ) AS addTime,
+        a.is_del as isDel,
+        a.is_use as isUse
+        FROM
+         m_app_push_log a
+        WHERE
+            a.push_model=13
+        AND find_in_set(#{organId},tag_name)
+        <if test="addTime!=null">
+            and  a.update_time>#{addTime}
+        </if>
+        ORDER BY
+        a.update_time ASC
+    </select>
+
+    <!-- 查询出该所有短信敏感词 分页-->
+    <select id="selSensitiveSms" parameterType="java.util.HashMap" resultType="com.jnzy.mdm.bean.sensiWords.SensitiveVO">
+        SELECT keywords,
+        addTime,isDel
+        from
+        (
+        select keywords as keywords,date_format(
+        add_time,
+        '%Y-%m-%d %H:%i:%s'
+        ) as addTime,
+        case
+        when status=1 then 0
+        else 1
+        END
+        as isDel
+        from m_sensitive_sms
+        where 1=1
+        <if test="addTime!=null">and add_time> #{addTime}
+        </if>
+        <if test="addTime==null">
+            and status=1
+        </if>
+        ORDER BY add_time DESC
+        ) a
+        GROUP BY keywords
+        ORDER BY
+        addTime ASC
+    </select>
+    <!-- 查询出该所有上网敏感词 分页-->
+    <select id="selSensitiveWebPage" parameterType="java.util.HashMap" resultType="com.jnzy.mdm.bean.sensiWords.SensitiveVO">
+        SELECT keywords,
+        addTime,isDel
+        from(
+            select keywords as keywords,
+            date_format(
+            add_time,
+            '%Y-%m-%d %H:%i:%s'
+            ) as addTime,is_del as isDel
+            from m_sensitive_web
+            where 1=1
+            <if test="addTime!=null">
+                and add_time>#{addTime}
+            </if>
+            <if test="addTime==null">
+                and is_del=0
+            </if>
+        ORDER BY add_time DESC
+        ) a
+        GROUP BY keywords
+        ORDER BY
+        addTime ASC
+        limit #{startIndex},#{pageSize}
+    </select>
+    <!-- 查询出该所有文件敏感词 分页-->
+    <select id="selSensitiveFilePage" parameterType="java.util.HashMap" resultType="com.jnzy.mdm.bean.sensiWords.SensitiveVO">
+        SELECT keywords,
+        addTime,isDel
+        from(
+
+            select keywords as keywords,
+            date_format(
+            add_time,
+            '%Y-%m-%d %H:%i:%s'
+            ) as addTime ,is_del as isDel
+            from m_sensitive_file
+            where 1=1
+            <if test="addTime!=null">
+                and add_time>#{addTime}
+            </if>
+            <if test="addTime==null">
+                and is_del=0
+            </if>
+          ORDER BY add_time DESC
+        )a
+        GROUP BY keywords
+        ORDER BY
+        addTime ASC
+        limit #{startIndex},#{pageSize}
+    </select>
+    <!-- 查询出该所有文件敏感词数量-->
+    <select id="selSensitiveFileCount" parameterType="java.util.HashMap" resultType="java.util.Map">
+        select count(1) num from m_sensitive_file
+        where 1=1
+        <if test="addTime!=null">
+            and  add_time>#{addTime}
+        </if>
+        <if test="addTime==null">
+            and is_del=0
+        </if>
+    </select>
+
+    <!-- 查询出该所有短信敏感词数量-->
+    <select id="selSensitiveSmsCount" parameterType="java.util.HashMap" resultType="java.util.Map">
+        select count(1) num
+        from m_sensitive_sms
+        where 1=1
+        <if test="addTime!=null">
+            and  add_time>#{addTime}
+        </if>
+        <if test="addTime==null">
+            and status=1
+        </if>
+    </select>
+    <!-- 查询出该所有上网敏感词数量-->
+    <select id="selSensitiveWebCount" parameterType="java.util.HashMap" resultType="java.util.Map">
+        select count(1) num from m_sensitive_web
+        where 1=1
+        <if test="addTime!=null">
+            and  add_time>#{addTime}
+        </if>
+        <if test="addTime==null">
+            and is_del=0
+        </if>
+    </select>
+
+</mapper>

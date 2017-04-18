@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC
+        "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jnzy.mdm.dao.persistence.ListMapper">
+    <!--根据时间查询出手机黑名单-->
+    <select id="selListMobile" parameterType="java.util.HashMap" resultType="com.jnzy.mdm.bean.push.PushAppVO">
+        SELECT
+        a.push_msg AS pushMsg,
+        date_format(
+        a.update_time,
+        '%Y-%m-%d %H:%i:%s'
+        ) AS addTime,
+        a.is_del as isDel,
+        a.is_use as isUse
+        FROM
+        m_app_push_log a
+        WHERE
+        a.push_model=4
+        <if test="addTime!=null">
+           and a.update_time>#{addTime}
+        </if>
+        <if test="addTime==null">
+            and a.is_use=0
+            and a.is_del=0
+        </if>
+        ORDER BY
+        a.update_time ASC
+    </select>
+
+    <!--查询手机黑名单-->
+    <select id="selMobileList" parameterType="java.util.HashMap" resultType="com.jnzy.mdm.bean.list.ListMobile">
+      SELECT a.number as number,a.is_del as isDel,
+        date_format(
+        a.add_time,
+        '%Y-%m-%d %H:%i:%s'
+        ) as addTime
+      from m_list_mobile a
+      <where>
+          <if test="addTime!=null">
+               a.add_time>#{addTime}
+          </if>
+          <if test="addTime==null">
+              and a.is_del=0
+          </if>
+      </where>
+        ORDER BY
+        a.add_time ASC
+    </select>
+
+</mapper>

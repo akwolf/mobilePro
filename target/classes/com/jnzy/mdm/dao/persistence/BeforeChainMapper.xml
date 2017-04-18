@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC
+        "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jnzy.mdm.dao.persistence.BeforeChainMapper">
+
+    <!--验证版本号-->
+    <select id="checkVersionCode" parameterType="java.util.HashMap" resultType="com.jnzy.mdm.bean.comm.AppUpdateVO">
+        select version_code as versionCode
+        from m_app_update
+        where is_available=0 and package_name=#{paramsPackage}
+        order BY add_time DESC
+        limit 1
+    </select>
+    <!--获取最新的版本号地址-->
+    <select id="selNewDownUrl" parameterType="java.util.HashMap" resultType="com.jnzy.mdm.bean.comm.AppUpdateVO">
+        SELECT down_url as downUrl,version_code as versionCode
+        from m_app_update
+        where is_available=0 and package_name=#{paramsPackage} and customized=#{biaoshi}
+        <if test="modelId!=null">
+            and model_id=#{modelId}
+        </if>
+        order by add_time DESC
+        limit 1
+    </select>
+
+    <!--proxy     demo     contacts    获取客户端升级地址-->
+    <select id="selAppUrlSystem" resultType="com.jnzy.mdm.bean.comm.AppUpdateVO">
+        SELECT
+        a.downUrl,
+        a.packageName
+        FROM
+        (
+            (
+                SELECT
+                    down_url AS downUrl,
+                    package_name AS packageName
+                FROM
+                    m_app_update
+                WHERE
+                    is_available = 0
+                AND package_name = 'me.uniauto.mdm.proxy'
+                ORDER BY
+                    add_time DESC
+                LIMIT 1
+            )
+            UNION ALL
+                (
+                    SELECT
+                        down_url AS downUrl,
+                        package_name AS packageName
+                    FROM
+                        m_app_update
+                    WHERE
+                        is_available = 0
+                    AND package_name = 'me.uniauto.mdm.demo'
+                    ORDER BY
+                        add_time DESC
+                    LIMIT 1
+                )
+            UNION ALL
+                (
+                    SELECT
+                        down_url AS downUrl,
+                        package_name AS packageName
+                    FROM
+                        m_app_update
+                    WHERE
+                        is_available = 0
+                    AND package_name = 'me.uniauto.mdm.contacts'
+                    ORDER BY
+                        add_time DESC
+                    LIMIT 1
+                )
+        ) a
+    </select>
+
+</mapper>

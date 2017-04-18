@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC
+        "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jnzy.mdm.dao.persistence.PushMapper">
+
+    <!--根据推送id获取推送信息-->
+    <select id="selPushLog" parameterType="java.lang.Integer" resultType="com.jnzy.mdm.bean.push.PushMsgLogVO">
+        select device_id as deviceId,tag_name as tagName,push_type as pushType,
+        push_msg as pushMsg,update_time as updateTime,push_model as pushModel,is_use as isUse,is_del as isDel
+        from m_app_push_log
+        where push_id=#{pushId}
+        limit 1
+    </select>
+    <!--查询出所有跟该设备号有关的策略单推  从组推中查询出跟该设备号有关的策略 所有群推的策略-->
+    <select id="selPushLogByOneTagAll" parameterType="java.util.HashMap" resultType="com.jnzy.mdm.bean.push.PushMsgLogVO">
+        SELECT
+            pushId,
+            pushMsg,
+            updateTime,
+            isUse,
+            isDel
+        FROM
+            (
+                SELECT
+                    push_id AS pushId,
+                    push_msg AS pushMsg,
+                    update_time AS updateTime,
+                    is_use as isUse,
+                    is_del as isDel
+                FROM
+                    m_app_push_log
+                WHERE
+                    device_id = #{deviceId}
+                AND push_type = 0 and push_model=1
+                <if test="pushMsgTime!=null">
+                AND update_time>#{pushMsgTime}
+                </if>
+                <if test="pushMsgTime==null">
+                    AND is_use=0
+                    and is_del=0
+                </if>
+
+                <if test="tagName!=null">
+                UNION ALL
+
+                    SELECT
+                    push_id AS pushId,
+                    push_msg AS pushMsg,
+                    update_time AS updateTime,
+                    is_use as isUse,
+                    is_del as isDel
+                    FROM
+                    m_app_push_log
+                    WHERE
+                    push_type = 1 and push_model=1
+                    <if test="pushMsgTime!=null">
+                      AND update_time>#{pushMsgTime}
+                    </if>
+                    <if test="pushMsgTime==null">
+                        AND is_use=0
+                        and is_del=0
+                    </if>
+                    AND find_in_set(
+                    #{tagName},tag_name
+                    )
+                </if>
+
+
+                    UNION ALL
+
+                        SELECT
+                            push_id AS pushId,
+                            push_msg AS pushMsg,
+                            update_time AS updateTime,
+                            is_use as isUse,
+                            is_del as isDel
+                        FROM
+                            m_app_push_log
+                        WHERE
+                            push_type = 2 and push_model=1
+                        <if test="pushMsgTime!=null">
+                          AND update_time>#{pushMsgTime}
+                        </if>
+                        <if test="pushMsgTime==null">
+                            AND is_use=0
+                            and is_del=0
+                        </if>
+            ) a
+        ORDER BY
+            a.updateTime ASC
+    </select>
+    <!--插入到推送成功记录表-->
+    <insert id="insertSuccessLog" parameterType="java.util.HashMap">
+        INSERT m_app_push_success_log
+        (push_id,device_id)
+        VALUES
+        (#{pushId},#{deviceId})
+    </insert>
+    <!--插入到推送失败记录表-->
+    <insert id="insertErrorLog" parameterType="java.util.HashMap">
+      INSERT m_app_push_error_log
+        (push_id,device_id)
+        VALUES
+        (#{pushId},#{deviceId})
+    </insert>
+    <!--推送记录结果表-->
+    <insert id="insertPushResult" parameterType="java.util.HashMap">
+      INSERT into ${table}
+      (push_id,device_id,is_success,create_time)
+      VALUES
+      (#{pushId},#{deviceId},#{isSuccess},NOW())
+    </insert>
+    <!--更改推送结果记录-->
+    <update id="updatePushLog" parameterType="java.util.HashMap">
+        UPDATE
+        ${table}
+        SET is_success=#{isSuccess} , create_time=NOW()
+        WHERE push_id=#{pushId} and device_id=#{deviceId}
+    </update>
+    <!--根据标签查询该标签下的用户-->
+    <select id="selUserDevice" parameterType="java.util.HashMap" resultType="java.lang.String">
+        SELECT device_id as deviceId
+        from m_user
+        where 1=1 and customized=#{biaoshi}
+        <if test="tagName!=null">
+          and o_id=#{tagName}
+        </if>
+    </select>
+
+
+    <!--根据设别号查询用户id-->
+    <select id="selUserIdByDeviceId" parameterType="java.util.HashMap" resultType="com.jnzy.mdm.bean.user.UserVO">
+        SELECT user_id as userId,o_id as organId
+        FROM m_user
+        WHERE device_id=#{deviceId}
+        limit 1
+    </select>
+    <!--更改用户激活字段-->
+    <update id="updateUserActiv" parameterType="java.lang.Integer">
+        UPDATE m_user
+        SET is_activation=0
+        where user_id=#{userId}
+    </update>
+    <!--判断数据库中是否存在该记录-->
+    <select id="selTagIdByUser" parameterType="java.util.HashMap" resultType="java.lang.Integer">
+        select push_user_tag_id as pushUserTagId
+        from m_app_push_user_tag
+        where user_id=#{userId} and device_id=#{deviceId}
+        limit 1
+    </select>
+    <!--插入到极光推送的用户标签表-->
+    <insert id="insertUserTag" parameterType="java.util.HashMap">
+        INSERT INTO m_app_push_user_tag
+        (
+          device_id
+          ,user_id
+          ,organ_id
+          ,is_success
+          ,add_time
+          ,registration_id
+        )
+        VALUES
+        (
+          #{deviceId}
+          ,#{userId}
+          ,#{organId}
+          ,#{isSuccess}
+          ,NOW()
+          ,#{registrationId}
+        )
+    </insert>
+    <!--更新用户标签表-->
+    <update id="updateUserTag" parameterType="java.util.HashMap">
+        UPDATE m_app_push_user_tag
+        SET is_success=#{isSuccess} and registration_id=#{registrationId}
+        where
+        push_user_tag_id=#{pushUserTagId}
+    </update>
+
+    <!--判断pushid是否存在-->
+    <select id="selPushLogByIdModel" parameterType="java.util.HashMap" resultType="java.lang.Integer">
+        select push_id as pushId
+        from m_app_push_log
+        where push_model=#{pushModel} and push_id=#{pushId} and device_id=#{deviceId}
+        limit 1
+    </select>
+    <!--更改推送记录是否成功状态-->
+    <update id="updatePushLogInfo" parameterType="java.util.HashMap">
+        update m_app_push_log
+        set is_push_seccess=#{isPushSeccess}
+        <if test="msgId!=null">
+            ,msg_id=#{msgId}
+        </if>
+        where push_id=#{pushId}
+    </update>
+
+    <!--根据设备号查询出最新的registration_id-->
+    <select id="selPushRegistrationId" parameterType="java.lang.String" resultType="java.lang.String">
+        select registration_id as registrationId
+        from m_app_push_registration_id
+        where device_id=#{deviceId}
+        order by add_time DESC
+        limit 1
+    </select>
+    
+</mapper>

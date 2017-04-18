@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC
+        "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jnzy.mdm.dao.persistence.MPushUserModelMapper">
+
+    <select id="selUserModel" resultType="java.util.Map">
+      SELECT
+          u.user_id userId,
+          u.device_id deviceId,
+          r.registration_id registrationId,
+          CONCAT(m.mobile_version,m.imei) modelTag
+        FROM
+          (SELECT
+            user_id,model_id,device_id
+          FROM
+            m_user m
+          WHERE NOT EXISTS
+            (SELECT
+              1
+            FROM
+              m_app_push_usermodel_tag t
+            WHERE m.device_id = t.device_id
+              AND is_success = 0)
+            AND m.customized = '1'
+            AND m.status = 1) u
+          JOIN
+            (SELECT
+              a.device_id,
+              a.registration_id
+            FROM
+              (SELECT
+                device_id,
+                registration_id
+              FROM
+                m_app_push_registration_id r
+              ORDER BY add_time DESC) a
+            GROUP BY device_id) r
+            ON u.device_id = r.device_id
+            JOIN m_mobile_model m ON u.model_id=m.id
+    </select>
+
+    <insert id="saveUserModelResults" parameterType="java.util.List" >
+        insert into m_app_push_usermodel_tag(
+          user_id, device_id, model_id, is_success, add_time, registration_id
+        ) values
+        <foreach collection="list" item="item" index="index" separator="," >
+            (
+            #{item.userId},#{item.deviceId},#{item.modelId},#{item.isSuccess},now(),#{item.registrationId}
+            )
+        </foreach>
+    </insert>
+
+</mapper>

@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="war" name="mdmInterfaceUnit:war">
+    <output-path>$PROJECT_DIR$/out/artifacts/mdmInterfaceUnit_war</output-path>
+    <root id="archive" name="mdmInterfaceUnit_war.war">
+      <element id="artifact" artifact-name="mdmInterfaceUnit:war exploded" />
+    </root>
+  </artifact>
+</component>
